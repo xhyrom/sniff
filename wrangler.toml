@@ -1,0 +1,6 @@
+name = "sniff"
+main = "build/worker/shim.mjs"
+compatibility_date = "2025-04-25"
+
+[build]
+command = "cargo install -q worker-build && worker-build --release"
