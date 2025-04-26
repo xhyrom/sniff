@@ -4,7 +4,8 @@ use serde::Serialize;
 mod details_response_serde {
     use googleplay_protobuf::{
         AppDetails, AppInfo, AppInfoContainer, AppInfoSection, DetailsResponse, DiscoveryBadge,
-        DiscoveryBadgeLink, DocumentDetails, Feature, Features, Image, Item, Link, PlayerBadge,
+        DiscoveryBadgeLink, DocumentDetails, Feature, Features, Image, Item, Link, Offer,
+        PlayerBadge,
     };
     use serde::ser::{SerializeStruct, Serializer};
 
@@ -55,6 +56,7 @@ mod details_response_serde {
     struct SerializableAppInfoContainer<'a>(&'a AppInfoContainer);
     struct SerializableAppDetails<'a>(&'a AppDetails);
     struct SerializableDocumentDetails<'a>(&'a DocumentDetails);
+    struct SerializableOffer<'a>(&'a Offer);
 
     impl<'a> serde::Serialize for SerializableItem<'a> {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -93,6 +95,12 @@ mod details_response_serde {
             }
 
             // offer
+            if !item.offer.is_empty() {
+                let serializable_offers: Vec<SerializableOffer> =
+                    item.offer.iter().map(SerializableOffer).collect();
+                state.serialize_field("offer", &serializable_offers)?;
+            }
+
             // availability
 
             // container_metadata
@@ -469,6 +477,100 @@ mod details_response_serde {
 
             if let Some(ref app_details) = details.app_details {
                 state.serialize_field("app_details", &SerializableAppDetails(app_details))?;
+            }
+
+            state.end()
+        }
+    }
+
+    impl<'a> serde::Serialize for SerializableOffer<'a> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let offer = self.0;
+            let mut state = serializer.serialize_struct("Offer", 1)?;
+
+            if let Some(ref micros) = offer.micros {
+                state.serialize_field("micros", micros)?;
+            }
+
+            if let Some(ref currency_code) = offer.currency_code {
+                state.serialize_field("currency_code", currency_code)?;
+            }
+
+            if let Some(ref formatted_amount) = offer.formatted_amount {
+                state.serialize_field("formatted_amount", formatted_amount)?;
+            }
+
+            if !offer.converted_price.is_empty() {
+                let converted_prices: Vec<SerializableOffer> = offer
+                    .converted_price
+                    .iter()
+                    .map(SerializableOffer)
+                    .collect();
+                state.serialize_field("converted_price", &converted_prices)?;
+            }
+
+            if let Some(ref checkout_flow_required) = offer.checkout_flow_required {
+                state.serialize_field("checkout_flow_required", checkout_flow_required)?;
+            }
+
+            if let Some(ref full_price_micros) = offer.full_price_micros {
+                state.serialize_field("full_price_micros", full_price_micros)?;
+            }
+
+            if let Some(ref formatted_full_amount) = offer.formatted_full_amount {
+                state.serialize_field("formatted_full_amount", formatted_full_amount)?;
+            }
+
+            if let Some(ref offer_type) = offer.offer_type {
+                state.serialize_field("offer_type", offer_type)?;
+            }
+
+            if let Some(ref on_sale_date) = offer.on_sale_date {
+                state.serialize_field("on_sale_date", on_sale_date)?;
+            }
+
+            if !offer.promotion_label.is_empty() {
+                let promotion_labels: Vec<String> = offer
+                    .promotion_label
+                    .iter()
+                    .map(|label| label.to_string())
+                    .collect();
+                state.serialize_field("promotion_label", &promotion_labels)?;
+            }
+
+            if let Some(ref formatted_name) = offer.formatted_name {
+                state.serialize_field("formatted_name", formatted_name)?;
+            }
+
+            if let Some(ref formatted_description) = offer.formatted_description {
+                state.serialize_field("formatted_description", formatted_description)?;
+            }
+
+            if let Some(ref licensed_offer_type) = offer.licensed_offer_type {
+                state.serialize_field("licensed_offer_type", licensed_offer_type)?;
+            }
+
+            //if let Some(ref subscription_content_terms) = offer.subscription_content_terms {
+            //    state.serialize_field("subscription_content_terms", subscription_content_terms)?;
+            //}
+
+            if let Some(ref offer_id) = offer.offer_id {
+                state.serialize_field("offer_id", offer_id)?;
+            }
+
+            if let Some(ref sale) = offer.sale {
+                state.serialize_field("sale", sale)?;
+            }
+
+            if let Some(ref instant_purchase_enabled) = offer.instant_purchase_enabled {
+                state.serialize_field("instant_purchase_enabled", instant_purchase_enabled)?;
+            }
+
+            if let Some(ref sale_message) = offer.sale_message {
+                state.serialize_field("sale_message", sale_message)?;
             }
 
             state.end()
