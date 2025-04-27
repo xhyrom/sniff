@@ -71,6 +71,51 @@ async fn handle_details_request(
     }
 }
 
+async fn handle_download_request(
+    _: Request,
+    state: &AppState,
+    package_name: &str,
+    channel: Channel,
+    version_code: Option<i32>,
+) -> Result<Response> {
+    let result = state
+        .client_registry
+        .lock()
+        .expect("Failed to lock client registry")
+        .get_download_info(package_name, channel, version_code)
+        .await;
+
+    match result {
+        Ok(Some((_, url))) => {
+            let response = ApiResponse {
+                success: true,
+                data: Some(url),
+                error: None,
+            };
+
+            Ok(Response::from_json(&response)?)
+        }
+        Ok(None) => {
+            let response = ApiResponse::<String> {
+                success: false,
+                data: None,
+                error: Some(format!("App '{}' not found", package_name)),
+            };
+
+            Ok(Response::from_json(&response)?.with_status(404))
+        }
+        Err(e) => {
+            let response = ApiResponse::<String> {
+                success: false,
+                data: None,
+                error: Some(e),
+            };
+
+            Ok(Response::from_json(&response)?.with_status(500))
+        }
+    }
+}
+
 async fn handle_details_multi_request(
     _: Request,
     state: &AppState,
@@ -145,6 +190,37 @@ async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
 
                 match Channel::from_str(channel) {
                     Ok(track) => handle_details_request(req, &ctx.data, package_name, track).await,
+                    Err(e) => {
+                        let response = ApiResponse::<()> {
+                            success: false,
+                            data: None,
+                            error: Some(e),
+                        };
+
+                        Ok(Response::from_json(&response)?.with_status(400))
+                    }
+                }
+            },
+        )
+        .get_async(
+            "/v1/download/:package_name/:channel/:version_code",
+            |req, ctx| async move {
+                let package_name = ctx.param("package_name").unwrap();
+                let channel = ctx.param("channel").unwrap();
+                let version_code = ctx.param("version_code").unwrap();
+                let version_code: i32 = version_code.parse().unwrap_or(0);
+
+                match Channel::from_str(channel) {
+                    Ok(track) => {
+                        handle_download_request(
+                            req,
+                            &ctx.data,
+                            package_name,
+                            track,
+                            Some(version_code),
+                        )
+                        .await
+                    }
                     Err(e) => {
                         let response = ApiResponse::<()> {
                             success: false,

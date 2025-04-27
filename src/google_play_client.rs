@@ -1,5 +1,5 @@
 use googleplay_protobuf::DetailsResponse;
-use gpapi::Gpapi;
+use gpapi::{DownloadInfo, Gpapi};
 use std::collections::HashSet;
 
 use lazy_static::lazy_static;
@@ -76,6 +76,17 @@ impl GooglePlayClient {
     pub async fn get_details(&self, package_name: &str) -> Result<Option<DetailsResponse>, String> {
         self.client
             .details(package_name)
+            .await
+            .map_err(|e| format!("API error for {} channel: {:?}", self.channel, e))
+    }
+
+    pub async fn get_download_info(
+        &self,
+        package_name: &str,
+        version_code: Option<i32>,
+    ) -> Result<DownloadInfo, String> {
+        self.client
+            .get_download_info(package_name, version_code)
             .await
             .map_err(|e| format!("API error for {} channel: {:?}", self.channel, e))
     }

@@ -1,3 +1,4 @@
+use gpapi::DownloadInfo;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use worker::{console_log, Env};
@@ -129,6 +130,26 @@ impl ClientRegistry {
         }
 
         Ok(results)
+    }
+
+    pub async fn get_download_info(
+        &mut self,
+        package_name: &str,
+        channel: Channel,
+        version_code: Option<i32>,
+    ) -> Result<Option<(Channel, DownloadInfo)>, String> {
+        if !channel.is_available_for_package(package_name) {
+            return Err(format!(
+                "Channel '{}' is not available for package '{}'",
+                channel, package_name
+            ));
+        }
+
+        let client = self.get_client(channel).await?;
+        match client.get_download_info(package_name, version_code).await {
+            Ok(download_info) => Ok(Some((channel, download_info))),
+            Err(e) => Err(e),
+        }
     }
 }
 

@@ -79,10 +79,10 @@ include!("device_properties.rs");
 
 static DEVICES_ENCODED: &[u8] = include_bytes!("device_properties.bin");
 
-type MainAPKDownloadURL = Option<String>;
-type SplitsDownloadInfo = Vec<(Option<String>, Option<String>)>;
-type AdditionalFilesDownloadInfo = Vec<(Option<String>, Option<String>)>;
-type DownloadInfo = (
+pub type MainAPKDownloadURL = Option<String>;
+pub type SplitsDownloadInfo = Vec<(Option<String>, Option<String>)>;
+pub type AdditionalFilesDownloadInfo = Vec<(Option<String>, Option<String>)>;
+pub type DownloadInfo = (
     MainAPKDownloadURL,
     SplitsDownloadInfo,
     AdditionalFilesDownloadInfo,
