@@ -41,7 +41,7 @@ Returns details for a specific channel (stable, beta, or alpha) if available.
 - `beta` - Beta program release (only available for certain apps)
 - `alpha` - Alpha program release (only available for certain apps)
 
-## Response Format
+**Response Format:**
 
 Successful responses follow this structure:
 
@@ -72,6 +72,66 @@ Error responses:
 }
 ```
 
+### Get Download URL for a Specific App Version
+
+```
+GET /v1/download/:package_name/:channel/:version_code
+```
+
+Retrieves the download URL for a specific version of an app from a particular channel.
+
+**Parameters:**
+
+- `package_name`: The package identifier of the app (e.g., `com.discord`)
+- `channel`: Release channel (`stable`, `beta`, or `alpha`)
+- `version_code`: The specific Android version code to download (integer)
+
+**Response Format:**
+
+Successful response:
+
+```json
+{
+  "success": true,
+  "data": [
+    "https://play.googleapis.com/download/by-token/download?token=tkn",
+    [
+      [
+        "config.xxhdpi",
+        "https://play.googleapis.com/download/by-token/download?token=tkn"
+      ],
+      [
+        "config.sk",
+        "https://play.googleapis.com/download/by-token/download?token=tkn"
+      ],
+      [
+        "config.cs",
+        "https://play.googleapis.com/download/by-token/download?token=tkn"
+      ],
+      [
+        "config.en",
+        "https://play.googleapis.com/download/by-token/download?token=tkn"
+      ],
+      [
+        "config.arm64_v8a",
+        "https://play.googleapis.com/download/by-token/download?token=tkn"
+      ]
+    ],
+    []
+  ],
+  "error": null
+}
+```
+
+Error response:
+
+```json
+{
+  "success": false,
+  "data": null,
+  "error": "App not found or version unavailable"
+}
+
 ## Deployment
 
 Sniff is designed to be deployed as a Cloudflare Worker, providing global distribution and low-latency access to the API.
@@ -87,3 +147,4 @@ The following environment variables are required:
 - `BETA_AAS_TOKEN`: Authentication token for beta access
 - `ALPHA_EMAIL`: Email enrolled in alpha programs
 - `ALPHA_AAS_TOKEN`: Authentication token for alpha access
+```
