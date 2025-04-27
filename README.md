@@ -131,6 +131,7 @@ Error response:
   "data": null,
   "error": "App not found or version unavailable"
 }
+```
 
 ## Deployment
 
@@ -147,4 +148,3 @@ The following environment variables are required:
 - `BETA_AAS_TOKEN`: Authentication token for beta access
 - `ALPHA_EMAIL`: Email enrolled in alpha programs
 - `ALPHA_AAS_TOKEN`: Authentication token for alpha access
-```
