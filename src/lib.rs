@@ -128,6 +128,11 @@ async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
     let router = Router::with_data(state);
 
     router
+        .get("/", |_req, _ctx| {
+            let url = Url::parse("https://xhyrom.dev/docs/sniff")?;
+
+            Response::redirect(url)
+        })
         .get_async("/v1/details/:package_name", |req, ctx| async move {
             let package_name = ctx.param("package_name").unwrap();
             handle_details_multi_request(req, &ctx.data, package_name).await
