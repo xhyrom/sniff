@@ -4,3 +4,6 @@ compatibility_date = "2025-04-25"
 
 [build]
 command = "cargo install -q worker-build && worker-build --release"
+
+[vars]
+DEVICE_NAME="sm_s9_plus"
