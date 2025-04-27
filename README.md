@@ -3,39 +3,39 @@
 </h1>
 
 **Sniff** is a specialized API service designed to retrieve Google Play Store app
-details across different release tracks (Stable, Beta, Alpha). It provides a clean
+details across different release channels (Stable, Beta, Alpha). It provides a clean
 interface to access app metadata including version information, changelog, download
 sizes, and other details for Android applications.
 
 ## Features
 
-- **Multi-Track Support**: Access app details from Stable, Beta, and Alpha tracks (where available)
-- **Intelligent Track Detection**: Automatically identifies which tracks are available for specific apps
+- **Multi-Channel Support**: Access app details from Stable, Beta, and Alpha channels (where available)
+- **Intelligent Track Detection**: Automatically identifies which channels are available for specific apps
 - **Unified API**: Simple REST API endpoints for accessing app information
 
 ## API Endpoints
 
-### Get App Details (All Available Tracks)
+### Get App Details (All Available Channels)
 
 ```
 GET /v1/details/:package_name
 ```
 
-Returns details for all available tracks for the specified package.
+Returns details for all available channels for the specified package.
 
 **Response Headers:**
 
-- `X-Available-Tracks`: Comma-separated list of available tracks for the app
+- `X-Available-Channels`: Comma-separated list of available channels for the app
 
-### Get App Details (Specific Track)
+### Get App Details (Specific Channel)
 
 ```
-GET /v1/details/:package_name/:track
+GET /v1/details/:package_name/:channel
 ```
 
-Returns details for a specific track (stable, beta, or alpha) if available.
+Returns details for a specific channel (stable, beta, or alpha) if available.
 
-**Possible tracks:**
+**Possible channels:**
 
 - `stable` - Production release (always available)
 - `beta` - Beta program release (only available for certain apps)
@@ -49,7 +49,7 @@ Successful responses follow this structure:
 {
   "success": true,
   "data": {
-    // For multi-track: track name -> details
+    // For multi-channel: track name -> details
     "stable": {
       /* app details */
     },

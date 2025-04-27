@@ -2,11 +2,11 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use worker::{console_log, Env};
 
-use crate::google_play_client::{GooglePlayClient, Track};
+use crate::google_play_client::{Channel, GooglePlayClient};
 
 pub struct ClientRegistry {
-    clients: HashMap<Track, GooglePlayClient>,
-    initialized: HashMap<Track, bool>,
+    clients: HashMap<Channel, GooglePlayClient>,
+    initialized: HashMap<Channel, bool>,
     env: Env,
 }
 
@@ -19,54 +19,54 @@ impl ClientRegistry {
         }
     }
 
-    pub async fn get_client(&mut self, track: Track) -> Result<&GooglePlayClient, String> {
-        if !self.clients.contains_key(&track) {
+    pub async fn get_client(&mut self, channel: Channel) -> Result<&GooglePlayClient, String> {
+        if !self.clients.contains_key(&channel) {
             let device_name = self.env.var("DEVICE_NAME").unwrap().to_string();
 
-            let (email, aas_token) = match track {
-                Track::Stable => (
+            let (email, aas_token) = match channel {
+                Channel::Stable => (
                     self.env.var("STABLE_EMAIL").unwrap().to_string(),
                     self.env.var("STABLE_AAS_TOKEN").unwrap().to_string(),
                 ),
-                Track::Beta => (
+                Channel::Beta => (
                     self.env.var("BETA_EMAIL").unwrap().to_string(),
                     self.env.var("BETA_AAS_TOKEN").unwrap().to_string(),
                 ),
-                Track::Alpha => (
+                Channel::Alpha => (
                     self.env.var("ALPHA_EMAIL").unwrap().to_string(),
                     self.env.var("ALPHA_AAS_TOKEN").unwrap().to_string(),
                 ),
             };
 
-            let client = GooglePlayClient::new(&device_name, &email, &aas_token, track);
-            self.clients.insert(track, client);
-            self.initialized.insert(track, false);
+            let client = GooglePlayClient::new(&device_name, &email, &aas_token, channel);
+            self.clients.insert(channel, client);
+            self.initialized.insert(channel, false);
         }
 
-        if !self.initialized.get(&track).unwrap_or(&false) {
-            let client = self.clients.get_mut(&track).unwrap();
+        if !self.initialized.get(&channel).unwrap_or(&false) {
+            let client = self.clients.get_mut(&channel).unwrap();
             client.initialize().await?;
-            self.initialized.insert(track, true);
+            self.initialized.insert(channel, true);
         }
 
-        Ok(self.clients.get(&track).unwrap())
+        Ok(self.clients.get(&channel).unwrap())
     }
 
     pub async fn get_details_with_fallback(
         &mut self,
         package_name: &str,
-        track: Track,
-    ) -> Result<Option<(Track, googleplay_protobuf::DetailsResponse)>, String> {
-        if !track.is_available_for_package(package_name) {
+        channel: Channel,
+    ) -> Result<Option<(Channel, googleplay_protobuf::DetailsResponse)>, String> {
+        if !channel.is_available_for_package(package_name) {
             return Err(format!(
-                "Track '{}' is not available for package '{}'",
-                track, package_name
+                "Channel '{}' is not available for package '{}'",
+                channel, package_name
             ));
         }
 
-        let client = self.get_client(track).await?;
+        let client = self.get_client(channel).await?;
         match client.get_details(package_name).await {
-            Ok(Some(response)) => return Ok(Some((track, response))),
+            Ok(Some(response)) => return Ok(Some((channel, response))),
             Ok(None) => return Ok(None),
             Err(e) => return Err(e),
         }
@@ -75,54 +75,54 @@ impl ClientRegistry {
     pub async fn get_details_multi(
         &mut self,
         package_name: &str,
-    ) -> Result<HashMap<Track, googleplay_protobuf::DetailsResponse>, String> {
+    ) -> Result<HashMap<Channel, googleplay_protobuf::DetailsResponse>, String> {
         let mut results = HashMap::new();
 
         match self
-            .get_details_with_fallback(package_name, Track::Stable)
+            .get_details_with_fallback(package_name, Channel::Stable)
             .await
         {
             Ok(Some((_, response))) => {
-                results.insert(Track::Stable, response);
+                results.insert(Channel::Stable, response);
             }
             Ok(None) => {
                 return Err(format!("App '{}' not found", package_name));
             }
             Err(e) => {
-                console_log!("Error fetching {} for stable track: {}", package_name, e);
+                console_log!("Error fetching {} for stable channel: {}", package_name, e);
                 return Err(e);
             }
         }
 
-        if Track::Beta.is_available_for_package(package_name) {
+        if Channel::Beta.is_available_for_package(package_name) {
             match self
-                .get_client(Track::Beta)
+                .get_client(Channel::Beta)
                 .await?
                 .get_details(package_name)
                 .await
             {
                 Ok(Some(response)) => {
-                    results.insert(Track::Beta, response);
+                    results.insert(Channel::Beta, response);
                 }
                 Err(e) => {
-                    console_log!("Error fetching {} for beta track: {}", package_name, e);
+                    console_log!("Error fetching {} for beta channel: {}", package_name, e);
                 }
                 _ => {}
             }
         }
 
-        if Track::Alpha.is_available_for_package(package_name) {
+        if Channel::Alpha.is_available_for_package(package_name) {
             match self
-                .get_client(Track::Alpha)
+                .get_client(Channel::Alpha)
                 .await?
                 .get_details(package_name)
                 .await
             {
                 Ok(Some(response)) => {
-                    results.insert(Track::Alpha, response);
+                    results.insert(Channel::Alpha, response);
                 }
                 Err(e) => {
-                    console_log!("Error fetching {} for alpha track: {}", package_name, e);
+                    console_log!("Error fetching {} for alpha channel: {}", package_name, e);
                 }
                 _ => {}
             }

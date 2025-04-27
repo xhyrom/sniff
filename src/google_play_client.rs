@@ -18,65 +18,65 @@ lazy_static! {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Track {
+pub enum Channel {
     Stable,
     Beta,
     Alpha,
 }
 
-impl std::fmt::Display for Track {
+impl std::fmt::Display for Channel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Track::Stable => write!(f, "stable"),
-            Track::Beta => write!(f, "beta"),
-            Track::Alpha => write!(f, "alpha"),
+            Channel::Stable => write!(f, "stable"),
+            Channel::Beta => write!(f, "beta"),
+            Channel::Alpha => write!(f, "alpha"),
         }
     }
 }
 
-impl Track {
+impl Channel {
     pub fn from_str(s: &str) -> Result<Self, String> {
         match s.to_lowercase().as_str() {
-            "stable" => Ok(Track::Stable),
-            "beta" => Ok(Track::Beta),
-            "alpha" => Ok(Track::Alpha),
-            _ => Err(format!("Invalid track: {}", s)),
+            "stable" => Ok(Channel::Stable),
+            "beta" => Ok(Channel::Beta),
+            "alpha" => Ok(Channel::Alpha),
+            _ => Err(format!("Invalid Channel: {}", s)),
         }
     }
 
     pub fn is_available_for_package(self, package_name: &str) -> bool {
         match self {
-            Track::Stable => true,
-            Track::Beta => BETA_PACKAGES.contains(package_name),
-            Track::Alpha => ALPHA_PACKAGES.contains(package_name),
+            Channel::Stable => true,
+            Channel::Beta => BETA_PACKAGES.contains(package_name),
+            Channel::Alpha => ALPHA_PACKAGES.contains(package_name),
         }
     }
 }
 
 pub struct GooglePlayClient {
     client: Gpapi,
-    track: Track,
+    channel: Channel,
 }
 
 impl GooglePlayClient {
-    pub fn new(device_name: &str, email: &str, aas_token: &str, track: Track) -> Self {
+    pub fn new(device_name: &str, email: &str, aas_token: &str, channel: Channel) -> Self {
         let mut client = Gpapi::new(device_name, email);
         client.set_aas_token(aas_token);
 
-        Self { client, track }
+        Self { client, channel }
     }
 
     pub async fn initialize(&mut self) -> Result<(), String> {
         self.client
             .login()
             .await
-            .map_err(|e| format!("Login error for {} track: {:?}", self.track, e))
+            .map_err(|e| format!("Login error for {} channel: {:?}", self.channel, e))
     }
 
     pub async fn get_details(&self, package_name: &str) -> Result<Option<DetailsResponse>, String> {
         self.client
             .details(package_name)
             .await
-            .map_err(|e| format!("API error for {} track: {:?}", self.track, e))
+            .map_err(|e| format!("API error for {} channel: {:?}", self.channel, e))
     }
 }

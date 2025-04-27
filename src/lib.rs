@@ -3,7 +3,7 @@ mod google_play_client;
 mod serializable_types;
 
 use client_registry::{create_registry, SharedClientRegistry};
-use google_play_client::Track;
+use google_play_client::Channel;
 use serde::Serialize;
 use serializable_types::SerializableDetailsResponse;
 use std::collections::HashMap;
@@ -17,7 +17,7 @@ struct ApiResponse<T> {
 }
 
 #[derive(Serialize)]
-struct MultiTrackApiResponse<T> {
+struct MultiChannelApiResponse<T> {
     success: bool,
     data: Option<HashMap<String, T>>,
     error: Option<String>,
@@ -31,13 +31,13 @@ async fn handle_details_request(
     _: Request,
     state: &AppState,
     package_name: &str,
-    track: Track,
+    channel: Channel,
 ) -> Result<Response> {
     let result = state
         .client_registry
         .lock()
         .expect("Failed to lock client registry")
-        .get_details_with_fallback(package_name, track)
+        .get_details_with_fallback(package_name, channel)
         .await;
 
     match result {
@@ -86,12 +86,14 @@ async fn handle_details_multi_request(
         Ok(details_map) => {
             let serialized_map: HashMap<String, SerializableDetailsResponse> = details_map
                 .into_iter()
-                .map(|(track, details)| (track.to_string(), SerializableDetailsResponse(details)))
+                .map(|(channel, details)| {
+                    (channel.to_string(), SerializableDetailsResponse(details))
+                })
                 .collect();
 
-            let available_tracks = serialized_map.keys().cloned().collect::<Vec<_>>().join(",");
+            let available_channels = serialized_map.keys().cloned().collect::<Vec<_>>().join(",");
 
-            let response = MultiTrackApiResponse {
+            let response = MultiChannelApiResponse {
                 success: true,
                 data: Some(serialized_map),
                 error: None,
@@ -100,12 +102,12 @@ async fn handle_details_multi_request(
             let mut headers = Headers::new();
 
             headers.set("Content-Type", "application/json")?;
-            headers.set("X-Available-Tracks", available_tracks.as_str())?;
+            headers.set("X-Available-Channels", available_channels.as_str())?;
 
             Ok(Response::from_json(&response)?.with_headers(headers))
         }
         Err(e) => {
-            let response = MultiTrackApiResponse::<SerializableDetailsResponse> {
+            let response = MultiChannelApiResponse::<SerializableDetailsResponse> {
                 success: false,
                 data: None,
                 error: Some(e),
@@ -130,23 +132,26 @@ async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
             let package_name = ctx.param("package_name").unwrap();
             handle_details_multi_request(req, &ctx.data, package_name).await
         })
-        .get_async("/v1/details/:package_name/:track", |req, ctx| async move {
-            let package_name = ctx.param("package_name").unwrap();
-            let track_str = ctx.param("track").unwrap();
+        .get_async(
+            "/v1/details/:package_name/:channel",
+            |req, ctx| async move {
+                let package_name = ctx.param("package_name").unwrap();
+                let channel = ctx.param("channel").unwrap();
 
-            match Track::from_str(track_str) {
-                Ok(track) => handle_details_request(req, &ctx.data, package_name, track).await,
-                Err(e) => {
-                    let response = ApiResponse::<()> {
-                        success: false,
-                        data: None,
-                        error: Some(e),
-                    };
+                match Channel::from_str(channel) {
+                    Ok(track) => handle_details_request(req, &ctx.data, package_name, track).await,
+                    Err(e) => {
+                        let response = ApiResponse::<()> {
+                            success: false,
+                            data: None,
+                            error: Some(e),
+                        };
 
-                    Ok(Response::from_json(&response)?.with_status(400))
+                        Ok(Response::from_json(&response)?.with_status(400))
+                    }
                 }
-            }
-        })
+            },
+        )
         .run(req, env)
         .await
 }
