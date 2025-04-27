@@ -45,7 +45,7 @@ Returns details for a specific channel (stable, beta, or alpha) if available.
 
 Successful responses follow this structure:
 
-```json
+```jsonc
 {
   "success": true,
   "data": {
@@ -55,10 +55,10 @@ Successful responses follow this structure:
     },
     "beta": {
       /* app details */
-    }
+    },
     // Alpha if available
   },
-  "error": null
+  "error": null,
 }
 ```
 
