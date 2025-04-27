@@ -74,8 +74,7 @@ fn main() {
             android_checkin.sim_operator = config.get(&section, "SimOperator");
             android_checkin.roaming = config.get(&section, "Roaming");
             android_checkin.user_number = Some(0);
-            let mut android_checkin_encoded = Vec::new();
-            android_checkin_encoded.reserve(android_checkin.encoded_len());
+            let mut android_checkin_encoded = Vec::with_capacity(android_checkin.encoded_len());
             android_checkin
                 .encode(&mut android_checkin_encoded)
                 .unwrap();
@@ -113,19 +112,19 @@ fn main() {
                 .get(&section, "SharedLibraries")
                 .unwrap()
                 .split(",")
-                .map(|s| String::from(s))
+                .map(String::from)
                 .collect();
             device_configuration.system_available_feature = config
                 .get(&section, "Features")
                 .unwrap()
                 .split(",")
-                .map(|s| String::from(s))
+                .map(String::from)
                 .collect();
             device_configuration.native_platform = config
                 .get(&section, "Platforms")
                 .unwrap_or_default()
                 .split(",")
-                .map(|s| String::from(s))
+                .map(String::from)
                 .collect();
             device_configuration.screen_width = config
                 .getint(&section, "Screen.Width")
@@ -139,13 +138,13 @@ fn main() {
                 .get(&section, "Locales")
                 .unwrap()
                 .split(",")
-                .map(|s| String::from(s))
+                .map(String::from)
                 .collect();
             device_configuration.gl_extension = config
                 .get(&section, "GL.Extensions")
                 .unwrap()
                 .split(",")
-                .map(|s| String::from(s))
+                .map(String::from)
                 .collect();
             device_configuration.device_feature = config
                 .get(&section, "Features")
@@ -159,8 +158,8 @@ fn main() {
                     device_feature
                 })
                 .collect();
-            let mut device_configuration_encoded = Vec::new();
-            device_configuration_encoded.reserve(device_configuration.encoded_len());
+            let mut device_configuration_encoded =
+                Vec::with_capacity(device_configuration.encoded_len());
             device_configuration
                 .encode(&mut device_configuration_encoded)
                 .unwrap();

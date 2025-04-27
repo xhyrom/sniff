@@ -25,6 +25,7 @@ gpapi = { path = "./gpapi" }
 googleplay-protobuf = "2"
 
 serde = { version = "1.0.219", features = ["derive"] }
+lazy_static = "1.5.0"
 
 [workspace]
 members = ["gpapi"]

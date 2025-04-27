@@ -1,9 +1,12 @@
-mod gpapi_manager;
+mod client_registry;
+mod google_play_client;
 mod serializable_types;
 
-use gpapi_manager::{create_manager, SharedGpapiManager};
+use client_registry::{create_registry, SharedClientRegistry};
+use google_play_client::Track;
 use serde::Serialize;
 use serializable_types::SerializableDetailsResponse;
+use std::collections::HashMap;
 use worker::*;
 
 #[derive(Serialize)]
@@ -13,37 +16,96 @@ struct ApiResponse<T> {
     error: Option<String>,
 }
 
+#[derive(Serialize)]
+struct MultiTrackApiResponse<T> {
+    success: bool,
+    data: Option<HashMap<String, T>>,
+    error: Option<String>,
+}
+
 struct AppState {
-    gpapi_manager: SharedGpapiManager,
+    client_registry: SharedClientRegistry,
 }
 
 async fn handle_details_request(
     _: Request,
     state: &AppState,
     package_name: &str,
+    track: Track,
 ) -> Result<Response> {
-    match state.gpapi_manager.get_details(package_name, None).await {
-        Ok(details_opt) => {
-            if let Some(details) = details_opt {
-                let response = ApiResponse {
-                    success: true,
-                    data: Some(SerializableDetailsResponse(details)),
-                    error: None,
-                };
+    let result = state
+        .client_registry
+        .lock()
+        .expect("Failed to lock client registry")
+        .get_details_with_fallback(package_name, track)
+        .await;
 
-                Response::from_json(&response)
-            } else {
-                let response = ApiResponse::<SerializableDetailsResponse> {
-                    success: false,
-                    data: None,
-                    error: Some(format!("App '{}' not found", package_name)),
-                };
+    match result {
+        Ok(Some((_, details))) => {
+            let response = ApiResponse {
+                success: true,
+                data: Some(SerializableDetailsResponse(details)),
+                error: None,
+            };
 
-                Ok(Response::from_json(&response)?.with_status(404))
-            }
+            Ok(Response::from_json(&response)?)
+        }
+        Ok(None) => {
+            let response = ApiResponse::<SerializableDetailsResponse> {
+                success: false,
+                data: None,
+                error: Some(format!("App '{}' not found", package_name)),
+            };
+
+            Ok(Response::from_json(&response)?.with_status(404))
         }
         Err(e) => {
             let response = ApiResponse::<SerializableDetailsResponse> {
+                success: false,
+                data: None,
+                error: Some(e),
+            };
+
+            Ok(Response::from_json(&response)?.with_status(500))
+        }
+    }
+}
+
+async fn handle_details_multi_request(
+    _: Request,
+    state: &AppState,
+    package_name: &str,
+) -> Result<Response> {
+    match state
+        .client_registry
+        .lock()
+        .expect("Failed to lock client registry")
+        .get_details_multi(package_name)
+        .await
+    {
+        Ok(details_map) => {
+            let serialized_map: HashMap<String, SerializableDetailsResponse> = details_map
+                .into_iter()
+                .map(|(track, details)| (track.to_string(), SerializableDetailsResponse(details)))
+                .collect();
+
+            let available_tracks = serialized_map.keys().cloned().collect::<Vec<_>>().join(",");
+
+            let response = MultiTrackApiResponse {
+                success: true,
+                data: Some(serialized_map),
+                error: None,
+            };
+
+            let mut headers = Headers::new();
+
+            headers.set("Content-Type", "application/json")?;
+            headers.set("X-Available-Tracks", available_tracks.as_str())?;
+
+            Ok(Response::from_json(&response)?.with_headers(headers))
+        }
+        Err(e) => {
+            let response = MultiTrackApiResponse::<SerializableDetailsResponse> {
                 success: false,
                 data: None,
                 error: Some(e),
@@ -58,20 +120,32 @@ async fn handle_details_request(
 async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
     console_error_panic_hook::set_once();
 
-    let device_name = env.var("DEVICE_NAME")?.to_string();
-    let email = env.var("EMAIL")?.to_string();
-    let aas_token = env.var("AAS_TOKEN")?.to_string();
-
-    let gpapi_manager = create_manager(&device_name, &email, &aas_token).await;
-    let state = AppState { gpapi_manager };
+    let client_registry = create_registry(env.clone()).await;
+    let state = AppState { client_registry };
 
     let router = Router::with_data(state);
 
     router
         .get_async("/v1/details/:package_name", |req, ctx| async move {
             let package_name = ctx.param("package_name").unwrap();
+            handle_details_multi_request(req, &ctx.data, package_name).await
+        })
+        .get_async("/v1/details/:package_name/:track", |req, ctx| async move {
+            let package_name = ctx.param("package_name").unwrap();
+            let track_str = ctx.param("track").unwrap();
 
-            handle_details_request(req, &ctx.data, package_name).await
+            match Track::from_str(track_str) {
+                Ok(track) => handle_details_request(req, &ctx.data, package_name, track).await,
+                Err(e) => {
+                    let response = ApiResponse::<()> {
+                        success: false,
+                        data: None,
+                        error: Some(e),
+                    };
+
+                    Ok(Response::from_json(&response)?.with_status(400))
+                }
+            }
         })
         .run(req, env)
         .await
