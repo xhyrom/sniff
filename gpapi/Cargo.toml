@@ -13,7 +13,8 @@ repository = "https://github.com/EFForg/rs-google-play/tree/master/gpapi"
 doctest = false
 
 [dependencies]
-prost = "0.13"
+prost = "0.14"
+prost-types = "0.14"
 reqwest = "0.12"
 bytes = "1"
 #hyper = { version = "0.14", features = ["full"] }
@@ -25,7 +26,8 @@ serde = { version = "1", features = ["derive"] }
 
 [build-dependencies]
 googleplay-protobuf = "2"
-prost = "0.13"
+prost = "0.14"
+prost-types = "0.14"
 bincode = "1"
 configparser = "3"
 serde = { version = "1", features = ["derive"] }
