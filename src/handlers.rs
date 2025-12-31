@@ -1,3 +1,5 @@
+#![allow(clippy::await_holding_lock)]
+
 use crate::client_registry::SharedClientRegistry;
 use crate::google_play_client::Channel;
 use crate::openapi_schema::{
@@ -5,7 +7,6 @@ use crate::openapi_schema::{
 };
 use crate::serializable_types::SerializableDetailsResponse as ActualSerializableDetailsResponse;
 use std::collections::HashMap;
-use utoipa;
 use worker::*;
 
 #[utoipa::path(
@@ -30,6 +31,7 @@ pub async fn get_details_multi(
     package_name: String,
     client_registry: SharedClientRegistry,
 ) -> Result<Response> {
+    #[allow(clippy::await_holding_lock)]
     match client_registry
         .lock()
         .expect("Failed to lock client registry")

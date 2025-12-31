@@ -6,7 +6,7 @@
 //! [embedded setup page](https://accounts.google.com/EmbeddedSetup/identifier?flowName=EmbeddedSetupAndroid)
 //! and opening the browser debugging console, logging in, and looking for the `oauth_token` cookie
 //! being set on your browser.  It will be present in the last requests being made and start with
-//! "oauth2_4/".  Copy this value.  It can only be used once, in order to obtain the `aas_token`,
+//! "oauth2_4/".  Copy this value.  It can only be used once, in order toa: Selfain the `aas_token`,
 //! which can be used subsequently.  To obtain this token:
 //!
 //! ```rust
@@ -113,15 +113,16 @@ impl Gpapi {
         Gpapi {
             locale: String::from("en_US"),
             timezone: String::from("UTC"),
-            device_properties: bincode::borrow_decode_from_slice::<
-                HashMap<String, EncodedDeviceProperties>,
-                bincode::config::Configuration,
-            >(DEVICES_ENCODED, bincode::config::standard())
-            .unwrap()
-            .0
-            .remove(&device_codename.into())
-            .expect("Invalid device codename")
-            .to_decoded(),
+            device_properties: EncodedDeviceProperties::into_decoded(
+                bincode::borrow_decode_from_slice::<
+                    HashMap<String, EncodedDeviceProperties>,
+                    bincode::config::Configuration,
+                >(DEVICES_ENCODED, bincode::config::standard())
+                .unwrap()
+                .0
+                .remove(&device_codename.into())
+                .expect("Invalid device codename"),
+            ),
             email: email.into(),
             aas_token: None,
             auth_token: None,
@@ -190,14 +191,14 @@ impl Gpapi {
             .execute_request_helper("auth", None, Some(&form_body.into_bytes()), headers, false)
             .await?;
 
-        let reply = parse_form_reply(&std::str::from_utf8(&body_bytes.to_vec()).unwrap());
+        let reply = parse_form_reply(std::str::from_utf8(&body_bytes).unwrap());
         Ok(reply)
     }
 
     /// Get the aas token that has been previously set by either `request_aas_token` or
     /// `set_aas_token`.
     pub fn get_aas_token(&self) -> Option<&str> {
-        self.aas_token.as_ref().map(|token| token.as_str())
+        self.aas_token.as_deref()
     }
 
     /// Log in to Google's Play Store API.  This is required for most other actions. The aas token
@@ -225,15 +226,15 @@ impl Gpapi {
     ///
     /// * `pkg_name` - A string type specifying the package's app ID, e.g. `com.instagram.android`
     /// * `version_code` - An optinal version code, given in i32.  If omitted, the latest version will
-    /// be used
+    ///   be used
     ///
     /// # Returns
     ///
     /// * An Option<String> to the full APK download URL, followed by a Vec<(Option<String>,
-    /// Option<String>)> which corresponds to a list of download URLs and names for the split APK,
-    /// then followed by another Vec<(Option<String>, Option<String>)> which corresponds to the
-    /// download URLs and filenames for additional files and finally an Option<String> that
-    /// contains the URL for the dexmetadata file.
+    ///   Option<String>)> which corresponds to a list of download URLs and names for the split APK,
+    ///   then followed by another Vec<(Option<String>, Option<String>)> which corresponds to the
+    ///   download URLs and filenames for additional files and finally an Option<String> that
+    ///   contains the URL for the dexmetadata file.
     pub async fn get_download_info<S: Into<String>>(
         &self,
         pkg_name: S,
@@ -263,7 +264,7 @@ impl Gpapi {
             if let Some(buy_response) = payload.buy_response {
                 if let Some(delivery_token) = buy_response.encoded_delivery_token {
                     return self
-                        .delivery(&pkg_name, version_code.clone(), &delivery_token)
+                        .delivery(&pkg_name, version_code, &delivery_token)
                         .await;
                 }
             }
@@ -396,11 +397,14 @@ impl Gpapi {
         if self.auth_token.is_none() {
             return Err(Box::new(GpapiError::new(GpapiErrorKind::LoginRequired)));
         }
-        let mut req = BulkDetailsRequest::default();
-        req.doc_id = pkg_names.into_iter().cloned().map(String::from).collect();
+        let mut req = BulkDetailsRequest {
+            doc_id: pkg_names.iter().cloned().map(String::from).collect(),
+            include_child_docs: Some(false),
+            ..Default::default()
+        };
+        req.doc_id = pkg_names.iter().cloned().map(String::from).collect();
         req.include_child_docs = Some(false);
-        let mut bytes = Vec::new();
-        bytes.reserve(req.encoded_len());
+        let mut bytes = Vec::with_capacity(req.encoded_len());
         req.encode(&mut bytes).unwrap();
         let resp = self
             .execute_request(
@@ -429,16 +433,17 @@ impl Gpapi {
             .unwrap()
             .clone();
 
-        let mut req = AndroidCheckinRequest::default();
-        req.id = Some(0);
-        req.checkin = Some(checkin);
-        req.locale = Some(self.locale.clone());
-        req.time_zone = Some(self.timezone.clone());
-        req.version = Some(3);
-        req.device_configuration = Some(self.device_properties.device_configuration.clone());
-        req.fragment = Some(0);
-        let mut bytes = Vec::new();
-        bytes.reserve(req.encoded_len());
+        let req = AndroidCheckinRequest {
+            id: Some(0),
+            checkin: Some(checkin),
+            locale: Some(self.locale.clone()),
+            time_zone: Some(self.timezone.clone()),
+            version: Some(3),
+            device_configuration: Some(self.device_properties.device_configuration.clone()),
+            fragment: Some(0),
+            ..Default::default()
+        };
+        let mut bytes = Vec::with_capacity(req.encoded_len());
         req.encode(&mut bytes).unwrap();
 
         let build_id = self
@@ -502,14 +507,14 @@ impl Gpapi {
                 .get("Vending.version")
                 .unwrap(),
             &build.sdk_version.as_ref().unwrap().to_string(),
-            &build.device.as_ref().unwrap(),
-            &build.product.as_ref().unwrap(),
-            &build.build_product.as_ref().unwrap(),
+            build.device.as_ref().unwrap(),
+            build.product.as_ref().unwrap(),
+            build.build_product.as_ref().unwrap(),
             self.device_properties
                 .extra_info
                 .get("Build.VERSION.RELEASE")
                 .unwrap(),
-            &build.model.as_ref().unwrap(),
+            build.model.as_ref().unwrap(),
             self.device_properties.extra_info.get("Build.ID").unwrap(),
             &device_configuration.native_platform.join(";"),
         );
@@ -630,10 +635,11 @@ impl Gpapi {
     async fn upload_device_config(
         &self,
     ) -> Result<Option<UploadDeviceConfigResponse>, Box<dyn Error + Send + Sync>> {
-        let mut req = UploadDeviceConfigRequest::default();
-        req.device_configuration = Some(self.device_properties.device_configuration.clone());
-        let mut bytes = Vec::new();
-        bytes.reserve(req.encoded_len());
+        let req = UploadDeviceConfigRequest {
+            device_configuration: Some(self.device_properties.device_configuration.clone()),
+            ..Default::default()
+        };
+        let mut bytes = Vec::with_capacity(req.encoded_len());
         req.encode(&mut bytes).unwrap();
 
         let mut headers = self.get_default_headers()?;
@@ -689,8 +695,8 @@ impl Gpapi {
             .execute_request_helper("auth", Some(form_params), Some(&[]), headers, false)
             .await?;
 
-        let reply = parse_form_reply(&std::str::from_utf8(&bytes.to_vec()).unwrap());
-        self.auth_token = reply.get("auth").map(|a| a.clone());
+        let reply = parse_form_reply(std::str::from_utf8(&bytes).unwrap());
+        self.auth_token = reply.get("auth").cloned();
         Ok(())
     }
 
@@ -875,10 +881,7 @@ fn parse_form_reply(data: &str) -> HashMap<String, String> {
     let lines: Vec<&str> = data.split_terminator('\n').collect();
     for line in lines.iter() {
         let kv: Vec<&str> = line.split_terminator('=').collect();
-        form_resp.insert(
-            String::from(kv[0]).to_lowercase(),
-            String::from(kv[1..].join("=")),
-        );
+        form_resp.insert(String::from(kv[0]).to_lowercase(), kv[1..].join("="));
     }
     form_resp
 }
@@ -978,6 +981,7 @@ impl BuildConfiguration {
 }
 
 impl BuildConfiguration {
+    #[allow(clippy::too_many_arguments)]
     fn new(
         finsky_version: &str,
         version_code: &str,

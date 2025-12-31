@@ -67,9 +67,9 @@ impl ClientRegistry {
 
         let client = self.get_client(channel).await?;
         match client.get_details(package_name).await {
-            Ok(Some(response)) => return Ok(Some((channel, response))),
-            Ok(None) => return Ok(None),
-            Err(e) => return Err(e),
+            Ok(Some(response)) => Ok(Some((channel, response))),
+            Ok(None) => Ok(None),
+            Err(e) => Err(e),
         }
     }
 
