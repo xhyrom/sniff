@@ -14,7 +14,7 @@
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!     let mut api = Gpapi::new("ad_g3_pro", &email);
+//!     let mut api = Gpapi::new("px_9_fold", &email);
 //!     api.request_aas_token(oauth_token).await.unwrap();
 //!     println!("{:?}", api.get_aas_token());
 //! }
