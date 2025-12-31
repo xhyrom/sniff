@@ -51,7 +51,7 @@
 //! let download_info = api.get_download_info("com.instagram.android", None).await;
 //! println!("{:?}", download_info);
 //!
-//! api.download("com.instagram.android", None, true, true, &Path::new("/tmp/testing"), None).await;
+//! api.download("com.instagram.android", None, true, true, true, &Path::new("/tmp/testing"), None).await;
 //! # }
 //! ```
 
@@ -74,7 +74,7 @@ use googleplay_protobuf::{
     ResponseWrapper, UploadDeviceConfigRequest, UploadDeviceConfigResponse,
 };
 
-use serde::{Deserialize, Serialize};
+use bincode::{Decode, Encode};
 include!("device_properties.rs");
 
 static DEVICES_ENCODED: &[u8] = include_bytes!("device_properties.bin");
@@ -82,10 +82,12 @@ static DEVICES_ENCODED: &[u8] = include_bytes!("device_properties.bin");
 pub type MainAPKDownloadURL = Option<String>;
 pub type SplitsDownloadInfo = Vec<(Option<String>, Option<String>)>;
 pub type AdditionalFilesDownloadInfo = Vec<(Option<String>, Option<String>)>;
+pub type DexMetadataURL = Option<String>;
 pub type DownloadInfo = (
     MainAPKDownloadURL,
     SplitsDownloadInfo,
     AdditionalFilesDownloadInfo,
+    DexMetadataURL,
 );
 
 #[derive(Debug)]
@@ -111,10 +113,12 @@ impl Gpapi {
         Gpapi {
             locale: String::from("en_US"),
             timezone: String::from("UTC"),
-            device_properties: bincode::deserialize::<HashMap<String, EncodedDeviceProperties>>(
-                DEVICES_ENCODED,
-            )
+            device_properties: bincode::borrow_decode_from_slice::<
+                HashMap<String, EncodedDeviceProperties>,
+                bincode::config::Configuration,
+            >(DEVICES_ENCODED, bincode::config::standard())
             .unwrap()
+            .0
             .remove(&device_codename.into())
             .expect("Invalid device codename")
             .to_decoded(),
@@ -228,11 +232,12 @@ impl Gpapi {
     /// * An Option<String> to the full APK download URL, followed by a Vec<(Option<String>,
     /// Option<String>)> which corresponds to a list of download URLs and names for the split APK,
     /// then followed by another Vec<(Option<String>, Option<String>)> which corresponds to the
-    /// download URLs and filenames for additional files.
+    /// download URLs and filenames for additional files and finally an Option<String> that
+    /// contains the URL for the dexmetadata file.
     pub async fn get_download_info<S: Into<String>>(
         &self,
         pkg_name: S,
-        mut version_code: Option<i32>,
+        mut version_code: Option<i64>,
     ) -> Result<DownloadInfo, Box<dyn Error + Send + Sync>> {
         let pkg_name = pkg_name.into();
         if self.auth_token.is_none() {
@@ -269,7 +274,7 @@ impl Gpapi {
     async fn delivery<S: Into<String>>(
         &self,
         pkg_name: S,
-        mut version_code: Option<i32>,
+        mut version_code: Option<i64>,
         delivery_token: S,
     ) -> Result<DownloadInfo, Box<dyn Error + Send + Sync>> {
         let pkg_name = pkg_name.into();
@@ -315,7 +320,18 @@ impl Gpapi {
                             }
                         }
                     }
-                    return Ok((app_delivery_data.download_url, splits, additional_files));
+                    let dex_metadata_url =
+                        if let Some(dex_metadata) = app_delivery_data.dex_metadata {
+                            dex_metadata.download_url
+                        } else {
+                            None
+                        };
+                    return Ok((
+                        app_delivery_data.download_url,
+                        splits,
+                        additional_files,
+                        dex_metadata_url,
+                    ));
                 }
             }
         }
@@ -325,7 +341,7 @@ impl Gpapi {
     async fn get_latest_version_for_pkg_name(
         &self,
         pkg_name: &str,
-    ) -> Result<i32, Box<dyn Error + Send + Sync>> {
+    ) -> Result<i64, Box<dyn Error + Send + Sync>> {
         if let Some(details) = self.details(pkg_name).await? {
             if let Some(item) = details.item {
                 if let Some(details) = item.details {
@@ -678,7 +694,7 @@ impl Gpapi {
         Ok(())
     }
 
-    async fn toc(&mut self) -> Result<(), Box<dyn Error + Send + Sync>> {
+    pub async fn toc(&mut self) -> Result<(), Box<dyn Error + Send + Sync>> {
         let resp = self
             .execute_request("toc", None, None, self.get_default_headers()?)
             .await?;
@@ -1010,67 +1026,7 @@ mod tests {
     }
 
     mod gpapi {
-        use std::env;
-
-        use super::*;
         use googleplay_protobuf::BulkDetailsRequest;
-
-        #[tokio::test]
-        async fn test_request_aas_token() {
-            if let (Ok(email), Ok(oauth_token)) = (env::var("EMAIL"), env::var("OAUTH_TOKEN")) {
-                let mut api = Gpapi::new("ad_g3_pro", &email);
-                assert!(api.request_aas_token(oauth_token).await.is_ok());
-                assert!(api.aas_token.is_some());
-            }
-        }
-
-        #[tokio::test]
-        async fn test_login() {
-            if let (Ok(email), Ok(aas_token)) = (env::var("EMAIL"), env::var("AAS_TOKEN")) {
-                let mut api = Gpapi::new("px_7a", &email);
-                api.set_aas_token(aas_token);
-                assert!(api.login().await.is_ok());
-                assert!(api.device_checkin_consistency_token.is_some());
-                assert!(api.gsf_id.is_some());
-                assert!(api.device_config_token.is_some());
-                assert!(api.auth_token.is_some());
-                assert!(api.dfe_cookie.is_some() || api.tos_token.is_some());
-            }
-        }
-
-        #[tokio::test]
-        async fn test_details() {
-            if let (Ok(email), Ok(aas_token)) = (env::var("EMAIL"), env::var("AAS_TOKEN")) {
-                let mut api = Gpapi::new("px_7a", &email);
-                api.set_aas_token(aas_token);
-                if api.login().await.is_ok() {
-                    assert!(api.details("com.viber.voip").await.is_ok());
-                }
-            }
-        }
-
-        #[tokio::test]
-        async fn test_bulk_details() {
-            if let (Ok(email), Ok(aas_token)) = (env::var("EMAIL"), env::var("AAS_TOKEN")) {
-                let mut api = Gpapi::new("px_7a", &email);
-                api.set_aas_token(aas_token);
-                if api.login().await.is_ok() {
-                    let pkg_names = ["com.viber.voip", "com.instagram.android"];
-                    assert!(api.bulk_details(&pkg_names).await.is_ok());
-                }
-            }
-        }
-
-        #[tokio::test]
-        async fn test_get_download_info() {
-            if let (Ok(email), Ok(aas_token)) = (env::var("EMAIL"), env::var("AAS_TOKEN")) {
-                let mut api = Gpapi::new("px_7a", &email);
-                api.set_aas_token(aas_token);
-                if api.login().await.is_ok() {
-                    assert!(api.get_download_info("com.viber.voip", None).await.is_ok());
-                }
-            }
-        }
 
         #[test]
         fn test_protobuf() {

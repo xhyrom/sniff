@@ -83,7 +83,7 @@ impl GooglePlayClient {
     pub async fn get_download_info(
         &self,
         package_name: &str,
-        version_code: Option<i32>,
+        version_code: Option<i64>,
     ) -> Result<DownloadInfo, String> {
         self.client
             .get_download_info(package_name, version_code)

@@ -55,7 +55,7 @@ pub async fn get_details_multi(
                 error: None,
             };
 
-            let mut headers = Headers::new();
+            let headers = Headers::new();
             headers.set("Content-Type", "application/json")?;
             headers.set("X-Available-Channels", &available_channels)?;
 
@@ -158,7 +158,7 @@ pub async fn get_details_single(
 pub async fn get_download_info(
     package_name: String,
     channel: String,
-    version_code: i32,
+    version_code: i64,
     client_registry: SharedClientRegistry,
 ) -> Result<Response> {
     let channel = match Channel::from_str(&channel) {

@@ -136,7 +136,7 @@ impl ClientRegistry {
         &mut self,
         package_name: &str,
         channel: Channel,
-        version_code: Option<i32>,
+        version_code: Option<i64>,
     ) -> Result<Option<(Channel, DownloadInfo)>, String> {
         if !channel.is_available_for_package(package_name) {
             return Err(format!(

@@ -148,6 +148,7 @@ pub struct DownloadInfo {
     pub main_apk_url: Option<String>,
     pub splits: Vec<SplitFile>,
     pub additional_files: Vec<AdditionalFile>,
+    pub dex_metadata_url: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -258,7 +259,8 @@ pub struct AppInfoContainer {
 
 impl From<gpapi::DownloadInfo> for DownloadInfo {
     fn from(gpapi_download_info: gpapi::DownloadInfo) -> Self {
-        let (main_apk_url, splits_data, additional_files_data) = gpapi_download_info;
+        let (main_apk_url, splits_data, additional_files_data, dex_metadata_url) =
+            gpapi_download_info;
 
         let splits = splits_data
             .into_iter()
@@ -280,6 +282,7 @@ impl From<gpapi::DownloadInfo> for DownloadInfo {
             main_apk_url,
             splits,
             additional_files,
+            dex_metadata_url,
         }
     }
 }

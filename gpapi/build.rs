@@ -10,7 +10,7 @@ use googleplay_protobuf::{
     AndroidBuildProto, AndroidCheckinProto, DeviceConfigurationProto, DeviceFeature,
 };
 
-use serde::{Deserialize, Serialize};
+use bincode::{Decode, Encode};
 include!("src/device_properties.rs");
 
 fn main() {
@@ -174,7 +174,8 @@ fn main() {
             );
         }
 
-        let devices_encoded: Vec<u8> = bincode::serialize(&device_properties_map).unwrap();
+        let devices_encoded: Vec<u8> =
+            bincode::encode_to_vec(&device_properties_map, bincode::config::standard()).unwrap();
 
         let mut file = File::create("src/device_properties.bin").unwrap();
         file.write_all(&devices_encoded).unwrap();
