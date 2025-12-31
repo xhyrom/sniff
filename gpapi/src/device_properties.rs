@@ -1,4 +1,4 @@
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Encode, Decode, Debug)]
 struct EncodedDeviceProperties {
     pub device_configuration: Vec<u8>,
     pub android_checkin: Vec<u8>,
@@ -27,7 +27,7 @@ impl EncodedDeviceProperties {
         }
     }
 
-    pub fn to_decoded(self) -> DeviceProperties {
+    pub fn into_decoded(self) -> DeviceProperties {
         DeviceProperties {
             device_configuration: DeviceConfigurationProto::decode(&mut Cursor::new(
                 &self.device_configuration.clone(),

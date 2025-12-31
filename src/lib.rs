@@ -30,7 +30,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         .get("/openapi.json", |_req, _ctx| {
             let spec = ApiDoc::openapi().to_pretty_json().unwrap();
 
-            let mut headers = Headers::new();
+            let headers = Headers::new();
             headers.set("Content-Type", "application/json")?;
 
             Ok(Response::ok(&spec)?.with_headers(headers))
@@ -57,7 +57,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
             |_req, ctx| async move {
                 let package_name = ctx.param("package_name").unwrap().to_string();
                 let channel = ctx.param("channel").unwrap().to_string();
-                let version_code: i32 = ctx.param("version_code").unwrap().parse().unwrap_or(0);
+                let version_code: i64 = ctx.param("version_code").unwrap().parse().unwrap_or(0);
                 handlers::get_download_info(
                     package_name,
                     channel,
