@@ -6,4 +6,4 @@ compatibility_date = "2025-04-25"
 command = "cargo install -q worker-build && worker-build --release"
 
 [vars]
-DEVICE_NAME="px_9_fold"
+DEVICE_NAME="sm_a13_5g"
